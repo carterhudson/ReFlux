@@ -61,6 +61,11 @@ inline fun <StateT : State, reified EventT : Event> sideEffectForEvent(
         }
     }
 
+fun <StateT : State> combineSideEffects(vararg sideEffects: SideEffect<StateT>) : SideEffect<StateT> =
+    SideEffect { state, event, dispatch, scope ->
+        sideEffects.forEach { it.handle(state, event, dispatch, scope) }
+    }
+
 typealias StateGetter<StateT> = () -> StateT
 
 typealias Middleware<StateT> = (StateGetter<StateT>) -> ((DispatchFunction) -> (DispatchFunction))

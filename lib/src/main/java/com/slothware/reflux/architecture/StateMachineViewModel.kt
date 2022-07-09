@@ -6,16 +6,19 @@ import kotlinx.coroutines.flow.StateFlow
 
 abstract class StateMachineViewModel<StateT : State>(
     initialState: StateT,
-    reducers: List<Reducer<StateT>>,
+    reducers: List<Reducer<StateT>> = emptyList(),
     middlewares: List<Middleware<StateT>> = emptyList(),
-    val sideEffect: SideEffect<StateT>
+    sideEffects: List<SideEffect<StateT>> = emptyList()
 ) : ViewModel() {
 
-    val stateMachine: StateMachine<StateT> = createStateMachine(
+    private val stateMachine: StateMachine<StateT> = createStateMachine(
         initialState = initialState,
         rootReducer = combineReducers(reducers = reducers.toTypedArray()),
-        enhancer = combineEnhancers(applyMiddleware(middlewares = middlewares.toTypedArray()))
+        enhancer = combineEnhancers(applyMiddleware(middlewares = middlewares.toTypedArray())),
     )
+
+    private val sideEffect: SideEffect<StateT> =
+        combineSideEffects(sideEffects = sideEffects.toTypedArray())
 
     val stateFlow: StateFlow<StateT> = stateMachine.state
 
