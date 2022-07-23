@@ -5,20 +5,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
-interface State
-interface Event
-interface Error
+interface ReFluxState
+interface ReFluxEvent
+interface ReFluxError
 
 // Returns an event to aid in composing dispatch functions for purposes of enhancers, like middleware
-typealias DispatchFunction = (Event) -> Event
+typealias DispatchFunction = (ReFluxEvent) -> ReFluxEvent
 
-typealias ViewModelDispatchFunction = (Event) -> Unit
+typealias ViewModelDispatchFunction = (ReFluxEvent) -> Unit
 
-fun interface Reducer<StateT : State> {
-    fun reduce(state: StateT, event: Event): StateT
+fun interface Reducer<StateT : ReFluxState> {
+    fun reduce(state: StateT, event: ReFluxEvent): StateT
 }
 
-inline fun <StateT : State, reified EventT : Event> reducerForEvent(
+inline fun <StateT : ReFluxState, reified EventT : ReFluxEvent> reducerForEvent(
     crossinline reduce: (state: StateT, event: EventT) -> StateT
 ): Reducer<StateT> =
     Reducer { state, event ->
@@ -28,7 +28,7 @@ inline fun <StateT : State, reified EventT : Event> reducerForEvent(
         }
     }
 
-fun <StateT : State> combineReducers(vararg reducers: Reducer<StateT>): Reducer<StateT> =
+fun <StateT : ReFluxState> combineReducers(vararg reducers: Reducer<StateT>): Reducer<StateT> =
     Reducer { state, event ->
         reducers.fold(state) { accumulatedState, nextReducer ->
             nextReducer.reduce(
@@ -38,16 +38,16 @@ fun <StateT : State> combineReducers(vararg reducers: Reducer<StateT>): Reducer<
         }
     }
 
-fun interface SideEffect<StateT : State> {
+fun interface SideEffect<StateT : ReFluxState> {
     fun handle(
         state: StateT,
-        event: Event,
+        event: ReFluxEvent,
         dispatch: ViewModelDispatchFunction,
         scope: CoroutineScope
     )
 }
 
-inline fun <StateT : State, reified EventT : Event> sideEffectForEvent(
+inline fun <StateT : ReFluxState, reified EventT : ReFluxEvent> sideEffectForEvent(
     crossinline handle: (
         state: StateT,
         event: EventT,
@@ -61,7 +61,7 @@ inline fun <StateT : State, reified EventT : Event> sideEffectForEvent(
         }
     }
 
-fun <StateT : State> combineSideEffects(vararg sideEffects: SideEffect<StateT>) : SideEffect<StateT> =
+fun <StateT : ReFluxState> combineSideEffects(vararg sideEffects: SideEffect<StateT>): SideEffect<StateT> =
     SideEffect { state, event, dispatch, scope ->
         sideEffects.forEach { it.handle(state, event, dispatch, scope) }
     }
@@ -70,7 +70,7 @@ typealias StateGetter<StateT> = () -> StateT
 
 typealias Middleware<StateT> = (StateGetter<StateT>) -> ((DispatchFunction) -> (DispatchFunction))
 
-interface StateMachine<StateT : State> {
+interface StateMachine<StateT : ReFluxState> {
     val state: StateFlow<StateT>
     var dispatch: DispatchFunction
     val getState: StateGetter<StateT>
@@ -82,7 +82,7 @@ typealias StateMachineCreator<StateT> = (
     enhancer: Any?
 ) -> StateMachine<StateT>
 
-private fun <StateT : State> createStateMachine(
+private fun <StateT : ReFluxState> createStateMachine(
     initialState: StateT,
     rootReducer: Reducer<StateT>
 ) = object : StateMachine<StateT> {
@@ -106,7 +106,7 @@ private fun <StateT : State> createStateMachine(
 
 typealias StateMachineEnhancer<StateT> = (StateMachineCreator<StateT>) -> StateMachineCreator<StateT>
 
-fun <StateT : State> createStateMachine(
+fun <StateT : ReFluxState> createStateMachine(
     initialState: StateT,
     rootReducer: Reducer<StateT>,
     enhancer: StateMachineEnhancer<StateT>? = null,
@@ -126,7 +126,7 @@ fun <StateT : State> createStateMachine(
     }(initialState, rootReducer, null)
 }
 
-fun <StateT : State> combineEnhancers(
+fun <StateT : ReFluxState> combineEnhancers(
     vararg enhancers: StateMachineEnhancer<StateT>
 ): StateMachineEnhancer<StateT> = { creator ->
     enhancers.fold(creator) { composedCreator, enhancer ->
@@ -137,13 +137,13 @@ fun <StateT : State> combineEnhancers(
 /**
  * Creates a [StateMachine] with one or many [StateMachineEnhancer]s.
  *
- * @param StateT any type that extends [State]
- * @param initialState the starting [State]
- * @param reducers list of [Reducer]s that calculate [State]s
+ * @param StateT any type that extends [ReFluxState]
+ * @param initialState the starting [ReFluxState]
+ * @param reducers list of [Reducer]s that calculate [ReFluxState]s
  * @param enhancers list of enhancers that can alter behavior of a [StateMachine] via composition
  * @return a [StateMachine]
  */
-fun <StateT : State> createStateMachine(
+fun <StateT : ReFluxState> createStateMachine(
     initialState: StateT,
     reducers: List<Reducer<StateT>>,
     enhancers: List<StateMachineEnhancer<StateT>>? = null,
@@ -156,12 +156,12 @@ fun <StateT : State> createStateMachine(
 /**
  * Convenience method for creating middleware a flat, instead of curried, signature.
  *
- * @param StateT any type that extends [State]
+ * @param StateT any type that extends [ReFluxState]
  * @param combinedSignature the un-curried middleware function
  * @return
  */
-fun <StateT : State> createMiddleware(
-    combinedSignature: (StateGetter<StateT>, DispatchFunction, Event) -> Event
+fun <StateT : ReFluxState> createMiddleware(
+    combinedSignature: (StateGetter<StateT>, DispatchFunction, ReFluxEvent) -> ReFluxEvent
 ): Middleware<StateT> =
     { getState ->
         { nextDispatchWrapper -> // takes a dispatch function, returns a dispatch function
@@ -175,11 +175,11 @@ fun <StateT : State> createMiddleware(
  * Function that creates a [StateMachineEnhancer] that can be used to apply [Middleware]
  * behavior to a [StateMachine]
  *
- * @param StateT any type that extends [State]
+ * @param StateT any type that extends [ReFluxState]
  * @param middlewares list of [Middleware] instances
  * @return a [StateMachineEnhancer]
  */
-fun <StateT : State> applyMiddleware(vararg middlewares: Middleware<StateT>): StateMachineEnhancer<StateT> =
+fun <StateT : ReFluxState> applyMiddleware(vararg middlewares: Middleware<StateT>): StateMachineEnhancer<StateT> =
     { stateMachineCreator ->
         { state, reducer, enhancer ->
             val stateMachine = stateMachineCreator(state, reducer, enhancer)
@@ -203,14 +203,14 @@ fun <StateT : State> applyMiddleware(vararg middlewares: Middleware<StateT>): St
     }
 
 // Middleware that invokes the block before the event is dispatched to reducers
-fun <StateT : State> eventPreProcessor(block: (state: StateT, event: Event) -> Unit): Middleware<StateT> =
+fun <StateT : ReFluxState> eventPreProcessor(block: (state: StateT, event: ReFluxEvent) -> Unit): Middleware<StateT> =
     createMiddleware { getState, dispatch, event ->
         block(getState(), event)
         dispatch(event)
     }
 
 // Middleware that invokes the block after the event is dispatched to reducers
-fun <StateT : State> eventPostProcessor(block: (state: StateT, event: Event) -> Unit): Middleware<StateT> =
+fun <StateT : ReFluxState> eventPostProcessor(block: (state: StateT, event: ReFluxEvent) -> Unit): Middleware<StateT> =
     createMiddleware { getState, dispatch, event ->
         dispatch(event).also {
             block(getState(), event)

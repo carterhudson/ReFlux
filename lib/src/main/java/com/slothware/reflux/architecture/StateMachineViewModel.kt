@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.StateFlow
 
-abstract class StateMachineViewModel<StateT : State>(
+abstract class StateMachineViewModel<StateT : ReFluxState>(
     initialState: StateT,
     reducers: List<Reducer<StateT>> = emptyList(),
     middlewares: List<Middleware<StateT>> = emptyList(),
@@ -25,7 +25,7 @@ abstract class StateMachineViewModel<StateT : State>(
     val currentState: StateT
         get() = stateFlow.value
 
-    fun dispatch(event: Event) {
+    fun dispatch(event: ReFluxEvent) {
         stateMachine.dispatch(event)
         sideEffect.handle(currentState, event, ::dispatch, viewModelScope)
     }
