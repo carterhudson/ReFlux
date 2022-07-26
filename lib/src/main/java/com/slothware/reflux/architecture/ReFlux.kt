@@ -1,9 +1,12 @@
 package com.slothware.reflux.architecture
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 interface ReFluxState
 interface ReFluxEvent
@@ -60,6 +63,34 @@ inline fun <StateT : ReFluxState, reified EventT : ReFluxEvent> sideEffectForEve
             is EventT -> handle(state, event, dispatch, scope)
         }
     }
+
+inline fun <reified StateT : ReFluxState, reified EventT : ReFluxEvent> debouncedSideEffectForEvent(
+    debounceMillis: Long,
+    crossinline debouncedWork: suspend (
+        state: StateT,
+        event: EventT,
+        dispatch: (ReFluxEvent) -> Unit
+    ) -> Unit
+): SideEffect<StateT> = object : SideEffect<StateT> {
+    private var debouncedJob: Job? = null
+
+    override fun handle(
+        state: StateT,
+        event: ReFluxEvent,
+        dispatch: ViewModelDispatchFunction,
+        scope: CoroutineScope
+    ) {
+        if (event !is EventT) {
+            return
+        }
+
+        debouncedJob?.cancel()
+        debouncedJob = scope.launch {
+            delay(debounceMillis)
+            debouncedWork(state, event, dispatch)
+        }
+    }
+}
 
 fun <StateT : ReFluxState> combineSideEffects(vararg sideEffects: SideEffect<StateT>): SideEffect<StateT> =
     SideEffect { state, event, dispatch, scope ->
