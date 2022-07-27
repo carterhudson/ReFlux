@@ -189,10 +189,14 @@ fun <StateT : ReFluxState> createStateMachine(
  *
  * @param StateT any type that extends [ReFluxState]
  * @param combinedSignature the un-curried middleware function
- * @return
+ * @return Middleware instance
  */
-fun <StateT : ReFluxState> createMiddleware(
-    combinedSignature: (StateGetter<StateT>, DispatchFunction, ReFluxEvent) -> ReFluxEvent
+inline fun <StateT : ReFluxState> createMiddleware(
+    crossinline combinedSignature: (
+        getState: StateGetter<StateT>,
+        dispatch: DispatchFunction,
+        event: ReFluxEvent
+    ) -> ReFluxEvent
 ): Middleware<StateT> =
     { getState ->
         { nextDispatchWrapper -> // takes a dispatch function, returns a dispatch function
